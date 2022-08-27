@@ -15,8 +15,8 @@ type Client struct {
 }
 
 var (
-	once       sync.Once
-	EtcdClient *Client
+	once sync.Once
+	Cli  *Client
 )
 
 func (cl *Client) Kv() v3.KV {
@@ -62,25 +62,19 @@ func (cl *Client) Close() error {
 	return cl.cli.Close()
 }
 
-func NewClient(cfg conf.EtcdConfig) (*Client, error) {
-	var (
-		err error
-		cli *v3.Client
-		kv  v3.KV
-	)
-	if EtcdClient == nil {
-		once.Do(func() {
-			cli, err = v3.New(v3.Config{Endpoints: cfg.Endpoints, DialTimeout: time.Second * cfg.DialTimeout})
-			if err != nil {
-				cli = nil
-			}
-			kv = v3.NewKV(cli)
-
-		})
-		EtcdClient = &Client{kv: kv, cli: cli, scheme: cfg.Scheme}
-	}
+func Init(cfg conf.EtcdConfig) error {
+	var err error
+	cli, err := v3.New(v3.Config{Endpoints: cfg.Endpoints, DialTimeout: time.Second * time.Duration(cfg.DialTimeout)})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return EtcdClient, nil
+	timeout, cancelFunc := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancelFunc()
+	if _, err = cli.Authenticate(timeout, cfg.Username, cfg.Password); err != nil {
+		return err
+	}
+	kv := v3.NewKV(cli)
+	Cli = &Client{kv: kv, cli: cli, scheme: cfg.Scheme}
+	return nil
+
 }

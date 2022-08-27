@@ -1,25 +1,18 @@
 package conf
 
 import (
-	"encoding/json"
-	"errors"
-	sp "github.com/bitly/go-simplejson"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
-	"time"
 )
 
 var Conf = new(Config)
 
-var (
-	ConfigError = errors.New("config is not found")
-	DEFAULTENV  = "DEV"
-)
-
 type EtcdConfig struct {
-	Endpoints   []string      `json:"endpoints"`
-	DialTimeout time.Duration `json:"dial-timeout"`
-	Scheme      string        `json:"scheme"`
+	Endpoints   []string `yaml:"endpoints"`
+	DialTimeout int64    `yaml:"dial_timeout"`
+	Scheme      string   `yaml:"scheme"`
+	Username    string   `yaml:"username"`
+	Password    string   `yaml:"password"`
 }
 
 type SqlConfig struct {
@@ -34,9 +27,9 @@ type SqlConfig struct {
 }
 
 type Config struct {
-	Etcd     EtcdConfig `json:"etcd"`
-	Database SqlConfig  `json:"database"`
-	Scheme   string     `json:"scheme"`
+	Etcd EtcdConfig `yaml:"etcd"`
+	//Database SqlConfig  `json:"database"`
+	Scheme string `yaml:"scheme"`
 }
 
 type YamlConfig struct {
@@ -50,32 +43,14 @@ type Md struct {
 	NoAuth bool `yaml:"no_auth"`
 }
 
-func ParseConfig(filepath string, object interface{}, env string) error {
+func ParseConfig(filepath string, cfg interface{}) error {
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return err
 	}
-	if env == "" {
-		// 未配置环境变量, 默认读取dev配置
-		env = DEFAULTENV
-	}
-	result, err := sp.NewJson(data)
-	if err != nil {
-		return err
-	}
-	if result.Get(env).Interface() == nil {
-		return ConfigError
-	}
-	if data, err = result.Get(env).Encode(); err != nil {
-		return err
-	}
-	return json.Unmarshal(data, object)
+	return yaml.Unmarshal(data, cfg)
 }
 
-func ParseYaml(filepath string, out interface{}) error {
-	data, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return err
-	}
-	return yaml.Unmarshal(data, out)
+func Init(filepath string) error {
+	return ParseConfig(filepath, Conf)
 }

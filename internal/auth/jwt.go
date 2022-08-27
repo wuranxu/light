@@ -16,7 +16,7 @@ var (
 
 type CustomClaims struct {
 	ID                 int    `json:"id"`    // userId
-	Email              string `json:"email"` // user_email
+	Email              string `json:"email"` // user email
 	Name               string `json:"name"`  // username
 	jwt.StandardClaims `json:"jwt,omitempty"`
 }
