@@ -3,5 +3,5 @@ etcd:
     - "127.0.0.1:2379"
   dial_timeout: 10
   scheme: pity
-  username: woody
-  password: woody123
+#  username: woody
+#  password: woody123

@@ -1,4 +1,4 @@
-package handler
+package service
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 const (
@@ -29,7 +30,36 @@ const (
 var (
 	InnerError  = errors.New("系统内部错误")
 	SystemError = errors.New("抱歉, 网络似乎开小差了")
+
+	// 服务连接缓存
+	ClientCache = &GrpcCache{cache: make(map[string]*rpc.GrpcClient)}
 )
+
+type GrpcCache struct {
+	lock  sync.RWMutex
+	cache map[string]*rpc.GrpcClient
+}
+
+func (g *GrpcCache) GetClient(service string) (*rpc.GrpcClient, error) {
+	g.lock.RLock()
+	client, ok := g.cache[service]
+	g.lock.RUnlock()
+	if ok {
+		return client, nil
+	}
+	client, err := rpc.NewGrpcClient(service)
+	if err != nil {
+		return nil, err
+	}
+	g.SetClient(service, client)
+	return client, nil
+}
+
+func (g *GrpcCache) SetClient(service string, client *rpc.GrpcClient) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.cache[service] = client
+}
 
 type Response interface {
 	toJson() []byte
@@ -125,7 +155,11 @@ func fileNameList(ctx *gin.Context) []string {
 func CallRpc(ctx *gin.Context) {
 	result := new(res)
 	params := make(Params)
-	var userInfo *auth.CustomClaims
+	var (
+		userInfo    *auth.CustomClaims
+		requestData *rpc.Request
+		err         error
+	)
 	// 如果是form
 	if strings.Contains(ctx.GetHeader("Content-Type"), "form") {
 		values := ctx.Request.PostForm
@@ -135,35 +169,41 @@ func CallRpc(ctx *gin.Context) {
 				params[k] = v[0]
 			}
 		}
+		requestData, err = params.Marshal()
+		if err != nil {
+			response(ctx, result.Build(ArgsParseFailed, err))
+			return
+		}
 	} else {
-		if err := ctx.ShouldBindJSON(&params); err != nil {
+		request, err := ioutil.ReadAll(ctx.Request.Body)
+		if err != nil {
 			response(ctx, result.Build(ArgsParseFailed, SystemError))
 			return
 		}
+		requestData = &rpc.Request{RequestJson: request}
 	}
 	// 获取url中版本/APP/方法名(首字母小写, 与其他语言服务保持一致)
 	version := ctx.Param("version")
 	service := ctx.Param("service")
 	method := ctx.Param("method")
-	client, err := rpc.NewGrpcClient(version, service, method)
-	defer client.Close()
+	client, err := ClientCache.GetClient(service)
 	if err != nil {
 		response(ctx, result.Build(MethodNotFound, err))
 		return
 	}
-	requestData, err := params.Marshal()
+	addr, err := client.SearchCallAddr(version, service, method)
 	if err != nil {
-		response(ctx, result.Build(ArgsParseFailed, err))
+		response(ctx, result.Build(MethodNotFound, err))
 		return
 	}
-	if !client.Authorization() {
+	if addr.Authorization {
 		// 需要解析token
 		if userInfo, err = middleware.GetUserInfo(ctx); err != nil {
 			response(ctx, result.Build(LoginRequired, err))
 			return
 		}
 	}
-	resp, err := client.Invoke(requestData, ctx.RemoteIP(), userInfo)
+	resp, err := client.Invoke(addr, requestData, ctx.RemoteIP(), userInfo)
 	if err != nil {
 		response(ctx, result.Build(RemoteCallFailed, err))
 		return

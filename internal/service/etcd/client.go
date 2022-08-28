@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/wuranxu/light/conf"
 	v3 "go.etcd.io/etcd/client/v3"
-	"sync"
+	re "google.golang.org/grpc/resolver"
 	"time"
 )
 
@@ -15,8 +15,8 @@ type Client struct {
 }
 
 var (
-	once sync.Once
-	Cli  *Client
+	Cli      *Client
+	Resolver re.Builder
 )
 
 func (cl *Client) Kv() v3.KV {
@@ -68,13 +68,14 @@ func Init(cfg conf.EtcdConfig) error {
 	if err != nil {
 		return err
 	}
-	timeout, cancelFunc := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancelFunc()
-	if _, err = cli.Authenticate(timeout, cfg.Username, cfg.Password); err != nil {
-		return err
-	}
+	//timeout, cancelFunc := context.WithTimeout(context.Background(), 3*time.Second)
+	//defer cancelFunc()
+	//if _, err = cli.Authenticate(timeout, cfg.Username, cfg.Password); err != nil {
+	//	return err
+	//}
 	kv := v3.NewKV(cli)
 	Cli = &Client{kv: kv, cli: cli, scheme: cfg.Scheme}
+	Resolver = NewResolver(Cli, conf.Conf.Etcd.Scheme)
 	return nil
 
 }

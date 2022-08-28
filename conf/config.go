@@ -40,7 +40,7 @@ type YamlConfig struct {
 }
 
 type Md struct {
-	NoAuth bool `yaml:"no_auth"`
+	Authorization bool `yaml:"authorization"`
 }
 
 func ParseConfig(filepath string, cfg interface{}) error {

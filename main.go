@@ -32,12 +32,5 @@ func main() {
 
 	router := api.NewRouter(app)
 	router.AddRoute()
-
-	// Method:   GET
-	// Resource: http://localhost:8080
-	//app.Handle("POST", "/:service/:method", auth.Auth(handler.CallRpc))
-	//app.Handle("POST", "/api/:service/:method", auth.Auth(handler.CallRpcWithAuth))
-	//app.Handle("POST", "/:version/:service/:method", handler.CallRpc)
-
 	app.Run(fmt.Sprintf("%s:%d", *serverHost, *serverPort))
 }

@@ -54,7 +54,6 @@ func (cl *Client) UnRegister(name, addr string) error {
 	return nil
 }
 
-// 传入yaml配置
 func (cl *Client) RegisterApi(name string, data interface{}, config conf.YamlConfig) error {
 	inf := reflect.ValueOf(data)
 	for i := 0; i < inf.NumMethod(); i++ {
@@ -64,7 +63,7 @@ func (cl *Client) RegisterApi(name string, data interface{}, config conf.YamlCon
 			// 说明配置文件没有包含此方法
 			log.Fatal("注册Api失败, service.yaml文件未包含此方法: ", methodName)
 		}
-		err := RegisterMethod(cl, config.Version, name, methodName, md.NoAuth)
+		err := RegisterMethod(cl, config.Version, name, methodName, md.Authorization)
 		if err != nil {
 			return err
 		}

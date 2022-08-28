@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/wuranxu/light/middleware"
+	"github.com/wuranxu/light/service"
 )
 
 type PityGatewayRouter struct {
@@ -21,6 +21,6 @@ func (p *PityGatewayRouter) AddRoute() {
 		context.String(200, "working!")
 	})
 
-	p.app.Use(middleware.Auth).POST("/")
+	p.app.POST("/:version/:service/:method", service.CallRpc)
 
 }
