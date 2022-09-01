@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shimingyah/pool"
 	"github.com/wuranxu/light/internal/auth"
 	"github.com/wuranxu/light/internal/service/etcd"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/resolver"
 	"time"
 )
 
@@ -23,8 +23,9 @@ var (
 )
 
 type GrpcClient struct {
-	cc  *grpc.ClientConn
+	//cc  *grpc.ClientConn
 	cli *etcd.Client
+	po  pool.Pool
 }
 
 func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo *auth.CustomClaims, opts ...grpc.CallOption) (*Response, error) {
@@ -36,7 +37,11 @@ func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo
 		md.Append("user", userInfo.Marshal())
 	}
 	ctx = metadata.NewOutgoingContext(ctx, md)
-	if err := c.cc.Invoke(ctx, method.Path, in, out, opts...); err != nil {
+	cn, err := c.po.Get()
+	if err != nil {
+		return out, err
+	}
+	if err := cn.Value().Invoke(ctx, method.Path, in, out, opts...); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -44,7 +49,7 @@ func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo
 
 func (c *GrpcClient) Close() error {
 	if c != nil {
-		return c.cc.Close()
+		return c.po.Close()
 	}
 	return nil
 }
@@ -63,11 +68,23 @@ func (c *GrpcClient) SearchCallAddr(version, service, method string) (etcd.Metho
 }
 
 func NewGrpcClient(service string) (*GrpcClient, error) {
-	resolver.Register(etcd.Resolver)
-	conn, err := grpc.DialContext(context.Background(), fmt.Sprintf("%s:///%s", etcd.Resolver.Scheme(), service),
-		grpc.WithDefaultServiceConfig(invokeConfig), grpc.WithInsecure())
+	p, err := pool.New(service, pool.Options{
+		Dial: func(address string) (*grpc.ClientConn, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			addr := fmt.Sprintf("%s:///%s", etcd.Resolver.Scheme(), service)
+			return grpc.DialContext(ctx, addr,
+				grpc.WithBlock(),
+				grpc.WithReturnConnectionError(),
+				grpc.WithDefaultServiceConfig(invokeConfig), grpc.WithInsecure())
+		},
+		MaxIdle:              8,
+		MaxActive:            64,
+		MaxConcurrentStreams: 64,
+		Reuse:                true,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &GrpcClient{cli: etcd.Cli, cc: conn}, nil
+	return &GrpcClient{etcd.Cli, p}, nil
 }

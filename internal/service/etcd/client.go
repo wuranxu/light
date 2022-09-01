@@ -76,6 +76,7 @@ func Init(cfg conf.EtcdConfig) error {
 	kv := v3.NewKV(cli)
 	Cli = &Client{kv: kv, cli: cli, scheme: cfg.Scheme}
 	Resolver = NewResolver(Cli, conf.Conf.Etcd.Scheme)
+	re.Register(Resolver)
 	return nil
 
 }

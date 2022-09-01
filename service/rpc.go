@@ -21,15 +21,18 @@ const (
 	LoginRequired
 	// MethodNotFound 方法未找到 10003
 	MethodNotFound
-	// RemoteCallFailed rpc调用失败 10004
+	// NoAvailableService 服务不存在10004
+	NoAvailableService
+	// RemoteCallFailed rpc调用失败 10005
 	RemoteCallFailed
-	// IntervalServerError 服务出错 10005
+	// IntervalServerError 服务出错 10006
 	IntervalServerError
 )
 
 var (
-	InnerError  = errors.New("系统内部错误")
-	SystemError = errors.New("抱歉, 网络似乎开小差了")
+	InnerError              = errors.New("系统内部错误")
+	SystemError             = errors.New("抱歉, 网络似乎开小差了")
+	NoAvailableServiceError = errors.New("服务未响应，请检查请求地址是否正确")
 
 	// 服务连接缓存
 	ClientCache = &GrpcCache{cache: make(map[string]*rpc.GrpcClient)}
@@ -40,20 +43,21 @@ type GrpcCache struct {
 	cache map[string]*rpc.GrpcClient
 }
 
-func (g *GrpcCache) GetClient(service string) (*rpc.GrpcClient, error) {
-	g.lock.RLock()
-	client, ok := g.cache[service]
-	g.lock.RUnlock()
-	if ok {
-		return client, nil
-	}
-	client, err := rpc.NewGrpcClient(service)
-	if err != nil {
-		return nil, err
-	}
-	g.SetClient(service, client)
-	return client, nil
-}
+//func (g *GrpcCache) GetClient(service string) (*rpc.GrpcClient, error) {
+//	g.lock.RLock()
+//	client, ok := g.cache[service]
+//	g.lock.RUnlock()
+//	if ok {
+//		return client, nil
+//	}
+//	client, err := rpc.NewGrpcClient(service)
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer client.Close()
+//	//g.SetClient(service, client)
+//	return client, nil
+//}
 
 func (g *GrpcCache) SetClient(service string, client *rpc.GrpcClient) {
 	g.lock.Lock()
@@ -186,7 +190,12 @@ func CallRpc(ctx *gin.Context) {
 	version := ctx.Param("version")
 	service := ctx.Param("service")
 	method := ctx.Param("method")
-	client, err := ClientCache.GetClient(service)
+	client, err := rpc.NewGrpcClient(service)
+	if err != nil {
+		response(ctx, result.Build(NoAvailableService, NoAvailableServiceError))
+		return
+	}
+	defer client.Close()
 	if err != nil {
 		response(ctx, result.Build(MethodNotFound, err))
 		return
