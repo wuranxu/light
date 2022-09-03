@@ -9,17 +9,21 @@ import (
 )
 
 const (
-	SignKey      = "PITY_GATEWAY"
+	SignKey      = "pityToken"
 	AuthFailCode = 103
 )
 
-func GetUserInfo(ctx *gin.Context) (*auth.CustomClaims, error) {
-	token := ctx.GetHeader("Authorization")
+func GetUserInfo(ctx *gin.Context) (*auth.UserInfo, error) {
+	token := ctx.GetHeader("token")
 	if s := strings.Split(token, " "); len(s) == 2 {
 		token = s[1]
 	}
 	j := auth.NewJWT(SignKey)
-	return j.ParseToken(token)
+	parseToken, err := j.ParseToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return &parseToken.UserInfo, nil
 }
 
 func Auth(ctx *gin.Context) {

@@ -14,14 +14,19 @@ var (
 	TokenInvalid     = errors.New("身份认证不合法")
 )
 
+type UserInfo struct {
+	ID    int    `json:"id"`    // userId
+	Email string `json:"email"` // user email
+	Name  string `json:"name"`  // username
+	Role  int    `json:"role"`
+}
+
 type CustomClaims struct {
-	ID                 int    `json:"id"`    // userId
-	Email              string `json:"email"` // user email
-	Name               string `json:"name"`  // username
+	UserInfo
 	jwt.StandardClaims `json:"jwt,omitempty"`
 }
 
-func (c *CustomClaims) Marshal() string {
+func (c *UserInfo) Marshal() string {
 	b, _ := json.Marshal(c)
 	return string(b)
 }

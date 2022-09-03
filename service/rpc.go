@@ -33,9 +33,6 @@ var (
 	InnerError              = errors.New("系统内部错误")
 	SystemError             = errors.New("抱歉, 网络似乎开小差了")
 	NoAvailableServiceError = errors.New("服务未响应，请检查请求地址是否正确")
-
-	// 服务连接缓存
-	ClientCache = &GrpcCache{cache: make(map[string]*rpc.GrpcClient)}
 )
 
 type GrpcCache struct {
@@ -160,7 +157,7 @@ func CallRpc(ctx *gin.Context) {
 	result := new(res)
 	params := make(Params)
 	var (
-		userInfo    *auth.CustomClaims
+		userInfo    *auth.UserInfo
 		requestData *rpc.Request
 		err         error
 	)

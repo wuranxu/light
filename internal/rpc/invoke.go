@@ -28,7 +28,7 @@ type GrpcClient struct {
 	po  pool.Pool
 }
 
-func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo *auth.CustomClaims, opts ...grpc.CallOption) (*Response, error) {
+func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo *auth.UserInfo, opts ...grpc.CallOption) (*Response, error) {
 	out := new(Response)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
