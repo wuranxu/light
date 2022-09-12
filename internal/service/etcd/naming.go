@@ -71,7 +71,6 @@ func (cl *Client) RegisterApi(name string, data interface{}, config conf.YamlCon
 	return nil
 }
 
-// 注销方法
 func (cl *Client) UnRegisterApi(name string, data interface{}, config conf.YamlConfig) error {
 	inf := reflect.ValueOf(data)
 	for i := 0; i < inf.NumMethod(); i++ {

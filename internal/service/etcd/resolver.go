@@ -74,20 +74,23 @@ func (r *resolver) addr(keyPrefix string) []re.Address {
 
 func (r *resolver) watch(keyPrefix string, addrList *[]re.Address) {
 	rch := r.client.cli.Watch(context.Background(), keyPrefix, clientv3.WithPrefix())
-	for n := range rch {
-		for _, ev := range n.Events {
-			addr := strings.TrimPrefix(string(ev.Kv.Key), keyPrefix)
-			switch ev.Type {
-			case mvccpb.PUT:
-				if !exist(*addrList, addr) {
-					*addrList = append(*addrList, re.Address{Addr: addr})
-				}
-			case mvccpb.DELETE:
-				if s, ok := remove(*addrList, addr); ok {
-					addrList = &s
-					r.cc.UpdateState(re.State{Addresses: *addrList})
-				}
+	for {
+		select {
+		case n := <-rch:
+			for _, ev := range n.Events {
+				addr := strings.TrimPrefix(string(ev.Kv.Key), keyPrefix)
+				switch ev.Type {
+				case mvccpb.PUT:
+					if !exist(*addrList, addr) {
+						*addrList = append(*addrList, re.Address{Addr: addr})
+					}
+				case mvccpb.DELETE:
+					if s, ok := remove(*addrList, addr); ok {
+						addrList = &s
+						r.cc.UpdateState(re.State{Addresses: *addrList})
+					}
 
+				}
 			}
 		}
 	}
