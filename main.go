@@ -26,10 +26,13 @@ func main() {
 		log.Fatal("init etcd error: ", err)
 	}
 	app := gin.New()
-	app.Use(cors.Default())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"OPTION", "GET", "PUT", "POST", "DELETE", "PATCH"},
+		AllowHeaders: []string{"*"},
+	}))
 	app.Use(gin.Logger())
 	app.Use(gin.Recovery())
-
 	router := api.NewRouter(app)
 	router.AddRoute()
 	app.Run(fmt.Sprintf("%s:%d", *serverHost, *serverPort))
