@@ -21,6 +21,7 @@ func (p *PityGatewayRouter) AddRoute() {
 		context.String(200, "working!")
 	})
 
-	p.app.POST("/:version/:service/:method", service.CallRpc)
+	//p.app.POST("/:version/:service/:method", service.CallRpc)
+	p.app.POST("/:version/:service/:method", service.Invoke)
 
 }

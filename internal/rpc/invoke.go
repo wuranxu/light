@@ -2,14 +2,18 @@ package rpc
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/wuranxu/light/internal/auth"
 	"github.com/wuranxu/light/internal/service/etcd"
 	"go.etcd.io/etcd/client/v3/naming/resolver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"io"
+	"strings"
 	"time"
 )
 
@@ -25,21 +29,48 @@ var (
 type GrpcClient struct {
 	cc  *grpc.ClientConn
 	cli *etcd.Client
+	rc  *ReflectionClient
 }
 
-func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo *auth.UserInfo, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
+//func (c *GrpcClient) Invoke(method etcd.Method, in *Request, ip string, userInfo *auth.UserInfo, opts ...grpc.CallOption) (*Response, error) {
+//	out := new(Response)
+//	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+//	defer cancel()
+//	md := metadata.New(map[string]string{"host": ip})
+//	if userInfo != nil {
+//		md.Append("user", userInfo.Marshal())
+//	}
+//	ctx = metadata.NewOutgoingContext(ctx, md)
+//	if err := c.cc.Invoke(ctx, method.Path, in, out, opts...); err != nil {
+//		return out, err
+//	}
+//	return out, nil
+//}
+
+func (c *GrpcClient) InvokeWithReflect(method etcd.Method, in io.ReadCloser, ip string, userInfo *auth.UserInfo, opts ...grpc.CallOption) (proto.Message, error) {
+	split := strings.Split(method.Path, "/")
+	service, mth := split[len(split)-2], split[len(split)-1]
 	md := metadata.New(map[string]string{"host": ip})
 	if userInfo != nil {
-		md.Append("user", userInfo.Marshal())
+		md.Append("user", base64.StdEncoding.EncodeToString(userInfo.Marshal()))
 	}
+	client := c.rc
+	cache, err := client.Args(service, mth, in)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	ctx = metadata.NewOutgoingContext(ctx, md)
-	if err := c.cc.Invoke(ctx, method.Path, in, out, opts...); err != nil {
-		return out, err
-	}
-	return out, nil
+	defer cancel()
+	err = c.cc.Invoke(ctx, method.Path, cache.req, cache.res, opts...)
+	//unary, err := client.InvokeUnary(ctx, cache.msgFactory, cache.md, cache.req, opts...)
+	//fmt.Println(time.Now().Unix())
+	//return unary, err
+	return cache.res, err
+}
+
+func (c *GrpcClient) Marshal(w io.Writer, msg proto.Message) error {
+	return c.rc.Marshal(w, msg)
 }
 
 func (c *GrpcClient) Close() error {
@@ -79,5 +110,5 @@ func NewGrpcClient(service string) (*GrpcClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &GrpcClient{conn, etcd.Cli}, nil
+	return &GrpcClient{conn, etcd.Cli, NewReflectionClient(conn)}, nil
 }

@@ -23,12 +23,12 @@ type UserInfo struct {
 
 type CustomClaims struct {
 	UserInfo
-	jwt.StandardClaims `json:"jwt,omitempty"`
+	jwt.StandardClaims
 }
 
-func (c *UserInfo) Marshal() string {
+func (c *UserInfo) Marshal() []byte {
 	b, _ := json.Marshal(c)
-	return string(b)
+	return b
 }
 
 type JWT struct {
